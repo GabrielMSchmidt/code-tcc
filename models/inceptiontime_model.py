@@ -33,16 +33,19 @@ def create_model(epochs, early_stopping_patience, restore_best_weights):
     )
     return model
 
-if __name__ == '__main__':
+def main(dataset_filename, hyperparams):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
-    DATASET_PATH = os.path.join(project_root, 'datasets', 'lcs_lag_90.npz')
+    DATASET_PATH = os.path.join(project_root, 'datasets', dataset_filename)
     MODEL_NAME = 'InceptionTime'
-    hyperparams = {
-        'epochs': 5,
-        'early_stopping_patience': 3,
-        'restore_best_weights': True,
-    }
+    # hyperparams = {
+    #     'epochs': 5,
+    #     'early_stopping_patience': 3,
+    #     'restore_best_weights': True,
+    # }
+
+    print(f"\n--- Iniciando Experimento: {MODEL_NAME} | Dataset: {dataset_filename} ---")
+    print(f"Hiperparâmetros: {hyperparams}")
 
     # 1. Carregar e pré-processar dados
     flux_global, flux_local, labels, splits = model_utils.load_and_preprocess_data(DATASET_PATH)

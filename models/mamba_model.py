@@ -2,86 +2,39 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, confusion_matrix
-import matplotlib.pyplot as plt
-import seaborn as sns
+import copy
+import os
 import time
+from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
-
-# Importações do Mamba
+from torchmetrics import AveragePrecision
 from mamba_ssm import Mamba
+from utils import model_utils
 
-
-# =================================================================================
-# 1. DEFINIÇÃO DA ARQUITETURA DO MODELO (DUAS TORRES)
-# =================================================================================
 
 class MambaDualClassifier(nn.Module):
     def __init__(self, d_model=64, d_state=8, d_conv=4, expand=2):
-        """
-        d_model: Dimensão do embedding interno do Mamba.
-        d_state: Dimensão do estado latente (N).
-        d_conv: Largura da convolução 1D interna.
-        expand: Fator de expansão da dimensão interna.
-        """
         super().__init__()
-
-        # Torre 1: Processa a visão global (input dim = 1)
-        self.mamba_global = Mamba(
-            d_model=d_model,
-            d_state=d_state,
-            d_conv=d_conv,
-            expand=expand,
-        )
-
-        # Torre 2: Processa a visão local (input dim = 1)
-        self.mamba_local = Mamba(
-            d_model=d_model,
-            d_state=d_state,
-            d_conv=d_conv,
-            expand=expand,
-        )
-
-        # Camadas de projeção para mapear o input de dim=1 para d_model
+        self.mamba_global = Mamba(d_model=d_model, d_state=d_state, d_conv=d_conv, expand=expand)
+        self.mamba_local = Mamba(d_model=d_model, d_state=d_state, d_conv=d_conv, expand=expand)
         self.global_proj = nn.Linear(1, d_model)
         self.local_proj = nn.Linear(1, d_model)
-
-        # Cabeça de Classificação: recebe os embeddings concatenados (2 * d_model)
         self.classification_head = nn.Sequential(
             nn.Linear(d_model * 2, 128),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(128, 2)  # Saída para 2 classes (planeta vs. não-planeta)
+            nn.Linear(128, 2)
         )
 
     def forward(self, x_global, x_local):
-        # Projetar inputs para a dimensão do modelo
-        x_global = self.global_proj(x_global)
-        x_local = self.local_proj(x_local)
-
-        # Processar cada visão em sua torre Mamba
-        global_out = self.mamba_global(x_global)
-        local_out = self.mamba_local(x_local)
-
-        # Usar o vetor de características do último passo de tempo
-        global_embedding = global_out[:, -1, :]
-        local_embedding = local_out[:, -1, :]
-
-        # Concatenar os embeddings
+        x_global, x_local = self.global_proj(x_global), self.local_proj(x_local)
+        global_out, local_out = self.mamba_global(x_global), self.mamba_local(x_local)
+        global_embedding, local_embedding = global_out[:, -1, :], local_out[:, -1, :]
         fused_embedding = torch.cat((global_embedding, local_embedding), dim=1)
-
-        # Classificação final
         output = self.classification_head(fused_embedding)
         return output
 
 
-# =================================================================================
-# 2. CARREGAMENTO E PREPARAÇÃO DOS DADOS
-# =================================================================================
-
-# --- Classe Dataset customizada para PyTorch com múltiplos inputs ---
 class ExoplanetDataset(Dataset):
     def __init__(self, global_views, local_views, labels):
         self.global_views = torch.tensor(global_views, dtype=torch.float32)
@@ -92,152 +45,176 @@ class ExoplanetDataset(Dataset):
         return len(self.labels)
 
     def __getitem__(self, idx):
-        return {
-            "global": self.global_views[idx],
-            "local": self.local_views[idx],
-            "label": self.labels[idx]
-        }
+        return self.global_views[idx], self.local_views[idx], self.labels[idx]
 
 
-# --- Carregar e processar os dados (lógica de normalização mantida) ---
-try:
-    data = np.load('../datasets/lcs_dataset_processed_sml.npz', allow_pickle=True)
-except FileNotFoundError:
-    print("Arquivo 'lcs_dataset_processed_sml.npz' não encontrado.")
-    exit()
+def main(dataset_filename, hyperparams):
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    DATASET_PATH = os.path.join(project_root, 'datasets', dataset_filename)
+    MODEL_NAME = 'Mamba'
+    # hyperparams = {
+    #     'd_model': 64,
+    #     'd_state': 8,
+    #     'd_conv': 4,
+    #     'expand': 2,
+    #     'learning_rate': 0.001,
+    #     'epochs': 100,
+    #     'early_stopping_patience': 15,
+    # }
 
-flux_global = data['flux_global']
-flux_local = data['flux_local']
-labels = data['label']
+    if torch.backends.mps.is_available():
+        DEVICE = torch.device("mps")
+    elif torch.cuda.is_available():
+        DEVICE = torch.device("cuda")
+    else:
+        DEVICE = torch.device("cpu")
+    print(f"Usando dispositivo: {DEVICE}")
 
-flux_global = np.nan_to_num(flux_global)
-flux_local = np.nan_to_num(flux_local)
-epsilon = 1e-7
-flux_global_norm = (flux_global - np.median(flux_global, axis=1, keepdims=True)) / (
-            np.std(flux_global, axis=1, keepdims=True) + epsilon)
-flux_local_norm = (flux_local - np.median(flux_local, axis=1, keepdims=True)) / (
-            np.std(flux_local, axis=1, keepdims=True) + epsilon)
+    # 1. Carregar e pré-processar dados
+    flux_global, flux_local, labels, splits = model_utils.load_and_preprocess_data(DATASET_PATH)
+    if flux_global is None:
+        exit()
 
-# A Mamba espera o formato (batch, length, dim), então adicionamos a última dimensão
-X_global_final = np.expand_dims(flux_global_norm, axis=-1)
-X_local_final = np.expand_dims(flux_local_norm, axis=-1)
+    # 2. Reshape específico para Mamba
+    X_global_reshaped = np.expand_dims(flux_global, axis=-1)
+    X_local_reshaped = np.expand_dims(flux_local, axis=-1)
 
-# --- Divisão de dados 60/20/20 ---
-X_g_train_val, X_g_test, X_l_train_val, X_l_test, y_train_val, y_test = train_test_split(
-    X_global_final, X_local_final, labels, test_size=0.2, random_state=42, stratify=labels)
+    # 3. Divisão dos dados
+    data_sets = model_utils.split_data_by_column(X_global_reshaped, X_local_reshaped, labels, splits)
 
-X_g_train, X_g_val, X_l_train, X_l_val, y_train, y_val = train_test_split(
-    X_g_train_val, X_l_train_val, y_train_val, test_size=0.25, random_state=42, stratify=y_train_val)
+    train_dataset = ExoplanetDataset(data_sets['X_global_train'], data_sets['X_local_train'], data_sets['y_train'])
+    val_dataset = ExoplanetDataset(data_sets['X_global_val'], data_sets['X_local_val'], data_sets['y_val'])
+    test_dataset = ExoplanetDataset(data_sets['X_global_test'], data_sets['X_local_test'], data_sets['y_test'])
 
-# --- Criar DataLoaders do PyTorch ---
-train_dataset = ExoplanetDataset(X_g_train, X_l_train, y_train)
-val_dataset = ExoplanetDataset(X_g_val, X_l_val, y_val)
-test_dataset = ExoplanetDataset(X_g_test, X_l_test, y_test)
+    train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=64 * 2)
+    test_loader = DataLoader(test_dataset, batch_size=64 * 2)
 
-train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=128)
-test_loader = DataLoader(test_dataset, batch_size=128)
+    # 4. Criação e treino do Modelo
+    model = MambaDualClassifier(d_model=hyperparams['d_model'], d_state=hyperparams['d_state'],
+                                d_conv=hyperparams['d_conv'], expand=hyperparams['expand']).to(DEVICE)
+    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Total de parâmetros treináveis do Mamba: {total_params:,}")
 
-# =================================================================================
-# 3. LOOP DE TREINAMENTO E VALIDAÇÃO
-# =================================================================================
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.AdamW(model.parameters(), lr=hyperparams['learning_rate'])
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', factor=0.2, patience=10, verbose=True, min_lr=1e-6)
 
-if torch.backends.mps.is_available():
-    device = torch.device("mps")
-elif torch.cuda.is_available():
-    device = torch.device("cuda")
-else:
-    device = torch.device("cpu")
+    # 5. Loop de Treinamento
+    print(f"\nIniciando o treinamento do modelo {MODEL_NAME} por {hyperparams['epochs']} épocas...")
+    best_val_pr_auc = -1.0
+    epochs_no_improve = 0
+    best_model_state = None
+    history = {'loss': [], 'val_loss': [], 'accuracy': [], 'val_accuracy': [], 'auc_pr': [], 'val_auc_pr': []}
+    pr_auc_metric = AveragePrecision(task="binary").to(DEVICE)
 
-print(f"Using device: {device}")
+    start_time = time.time()
+    for epoch in range(hyperparams['epochs']):
+        model.train()
+        total_train_loss, total_train_acc, total_train_samples = 0, 0, 0
+        pr_auc_metric.reset()
 
-model = MambaDualClassifier().to(device)
-optimizer = optim.AdamW(model.parameters(), lr=1e-3)
-criterion = nn.CrossEntropyLoss()
-n_epochs = 25  # Mamba tende a convergir rápido
+        progress_bar = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{hyperparams['epochs']} [Train]")
+        for batch_global, batch_local, batch_labels in progress_bar:
+            batch_global, batch_local, batch_labels = batch_global.to(DEVICE), batch_local.to(DEVICE), batch_labels.to(
+                DEVICE)
 
-print("\nIniciando o treinamento do modelo Mamba (Duas Torres)...")
+            optimizer.zero_grad()
+            outputs = model(batch_global, batch_local)
+            loss = criterion(outputs, batch_labels)
+            loss.backward()
+            optimizer.step()
 
-for epoch in range(n_epochs):
-    model.train()
-    total_train_loss = 0
-    progress_bar = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{n_epochs} [Train]")
+            total_train_loss += loss.item() * batch_labels.size(0)
+            preds_proba = torch.softmax(outputs, dim=1)[:, 1]
+            pr_auc_metric.update(preds_proba, batch_labels)
+            predicted_classes = torch.argmax(outputs, dim=1)
+            total_train_acc += (predicted_classes == batch_labels).sum().item()
+            total_train_samples += batch_labels.size(0)
+            progress_bar.set_postfix(loss=loss.item())
 
-    for batch in progress_bar:
-        optimizer.zero_grad()
+        epoch_train_loss = total_train_loss / total_train_samples
+        epoch_train_acc = total_train_acc / total_train_samples
+        epoch_train_pr_auc = pr_auc_metric.compute().item()
+        history['loss'].append(epoch_train_loss)
+        history['accuracy'].append(epoch_train_acc)
+        history['auc_pr'].append(
+            epoch_train_pr_auc)
 
-        global_batch = batch['global'].to(device)
-        local_batch = batch['local'].to(device)
-        labels_batch = batch['label'].to(device)
+        # Validação
+        model.eval()
+        total_val_loss, total_val_acc, total_val_samples = 0, 0, 0
+        pr_auc_metric.reset()
+        with torch.no_grad():
+            for batch_global, batch_local, batch_labels in val_loader:
+                batch_global, batch_local, batch_labels = batch_global.to(DEVICE), batch_local.to(
+                    DEVICE), batch_labels.to(DEVICE)
+                outputs = model(batch_global, batch_local)
+                loss = criterion(outputs, batch_labels)
 
-        outputs = model(global_batch, local_batch)
-        loss = criterion(outputs, labels_batch)
+                total_val_loss += loss.item() * batch_labels.size(0)
+                preds_proba = torch.softmax(outputs, dim=1)[:, 1]
+                pr_auc_metric.update(preds_proba, batch_labels)
+                predicted_classes = torch.argmax(outputs, dim=1)
+                total_val_acc += (predicted_classes == batch_labels).sum().item()
+                total_val_samples += batch_labels.size(0)
 
-        loss.backward()
-        optimizer.step()
+        epoch_val_loss = total_val_loss / total_val_samples
+        epoch_val_acc = total_val_acc / total_val_samples
+        epoch_val_pr_auc = pr_auc_metric.compute().item()
+        history['val_loss'].append(epoch_val_loss)
+        history['val_accuracy'].append(epoch_val_acc)
+        history['val_auc_pr'].append(
+            epoch_val_pr_auc)
 
-        total_train_loss += loss.item()
-        progress_bar.set_postfix(loss=loss.item())
+        print(
+            f"Epoch {epoch + 1}/{hyperparams['epochs']} | Train Loss: {epoch_train_loss:.4f}, Val Loss: {epoch_val_loss:.4f} | Train PR-AUC: {epoch_train_pr_auc:.4f}, Val PR-AUC: {epoch_val_pr_auc:.4f}")
 
-    # Validação
+        # Early Stopping
+        if epoch_val_pr_auc > best_val_pr_auc:
+            best_val_pr_auc = epoch_val_pr_auc
+            epochs_no_improve = 0
+            best_model_state = copy.deepcopy(model.state_dict())
+        else:
+            epochs_no_improve += 1
+
+        if epochs_no_improve >= hyperparams['early_stopping_patience']:
+            print(f"\nEarly stopping na época {epoch + 1}.")
+            model.load_state_dict(best_model_state)
+            break
+
+        scheduler.step(epoch_val_pr_auc)
+    end_time = time.time()
+    training_time = end_time - start_time
+    print(f"\nTreinamento concluído em {training_time:.2f} segundos.")
+
+    if best_model_state:
+        model.load_state_dict(best_model_state)
+
+    # 6. Avaliação do Modelo
     model.eval()
-    total_val_loss = 0
-    correct_val = 0
-    total_val = 0
+    all_preds_proba, all_labels = [], []
     with torch.no_grad():
-        for batch in val_loader:
-            global_batch = batch['global'].to(device)
-            local_batch = batch['local'].to(device)
-            labels_batch = batch['label'].to(device)
+        for batch_global, batch_local, batch_labels in test_loader:
+            batch_global, batch_local = batch_global.to(DEVICE), batch_local.to(DEVICE)
+            outputs = model(batch_global, batch_local)
+            preds_proba = torch.softmax(outputs, dim=1)
+            all_preds_proba.extend(preds_proba.cpu().numpy())
+            all_labels.extend(batch_labels.cpu().numpy())
 
-            outputs = model(global_batch, local_batch)
-            loss = criterion(outputs, labels_batch)
-            total_val_loss += loss.item()
+    y_pred_proba_all = np.array(all_preds_proba)
+    y_pred_proba_positive = y_pred_proba_all[:, 1]
+    y_true = np.array(all_labels)
 
-            _, predicted = torch.max(outputs.data, 1)
-            total_val += labels_batch.size(0)
-            correct_val += (predicted == labels_batch).sum().item()
-
-    avg_train_loss = total_train_loss / len(train_loader)
-    avg_val_loss = total_val_loss / len(val_loader)
-    val_accuracy = 100 * correct_val / total_val
-    print(
-        f"Epoch {epoch + 1} | Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f} | Val Acc: {val_accuracy:.2f}%")
-
-# =================================================================================
-# 4. AVALIAÇÃO FINAL NO CONJUNTO DE TESTE
-# =================================================================================
-print("\n--- Avaliação Final no Conjunto de Teste (Mamba) ---")
-model.eval()
-all_preds = []
-all_labels = []
-with torch.no_grad():
-    for batch in test_loader:
-        global_batch = batch['global'].to(device)
-        local_batch = batch['local'].to(device)
-        labels_batch = batch['label'].to(device)
-
-        outputs = model(global_batch, local_batch)
-        _, predicted = torch.max(outputs.data, 1)
-        all_preds.extend(predicted.cpu().numpy())
-        all_labels.extend(labels_batch.cpu().numpy())
-
-y_pred_classes = np.array(all_preds)
-y_test_final = np.array(all_labels)
-
-# Reutilizando o mesmo código de avaliação para consistência
-print("\nClassification Report:")
-report = classification_report(y_test_final, y_pred_classes,
-                               target_names=['Classe 0 (Não Planeta)', 'Classe 1 (Planeta)'])
-print(report)
-
-print("\nConfusion Matrix:")
-cm = confusion_matrix(y_test_final, y_pred_classes)
-plt.figure(figsize=(8, 6))
-sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-            xticklabels=['Previsto Não Planeta', 'Previsto Planeta'],
-            yticklabels=['Real Não Planeta', 'Real Planeta'])
-plt.xlabel('Previsão')
-plt.ylabel('Real')
-plt.title('Matriz de Confusão - Mamba (Duas Torres)')
-plt.show()
+    # 7. Plotar e salvar os resultados
+    model_utils.save_results(
+        model_name=MODEL_NAME,
+        dataset_path=DATASET_PATH,
+        hyperparameters=hyperparams,
+        history=history,
+        y_true=y_true,
+        y_pred_proba=y_pred_proba_positive,
+        training_time=training_time,
+        threshold=0.5
+    )

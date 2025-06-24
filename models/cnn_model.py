@@ -60,7 +60,7 @@ def create_model(global_view_shape=(201, 1), local_view_shape=(61, 1), learning_
     return model
 
 
-if __name__ == '__main__':
+def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
     DATASET_PATH = os.path.join(project_root, 'datasets', 'lcs_lag_90.npz')
