@@ -260,7 +260,7 @@ def save_results(model_name, dataset_path, hyperparameters, history, y_true, y_p
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     dataset_name = os.path.splitext(os.path.basename(dataset_path))[0]
     pr_auc = average_precision_score(y_true, y_pred_proba)
-    experiment_name = f"{model_name}_{dataset_name}_e{pr_auc:.2f}_{timestamp}"
+    experiment_name = f"{model_name}_{dataset_name}_pr{pr_auc:.4f}_{timestamp}"
     project_root = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(project_root)
     results_dir = os.path.join(project_root, 'results')

@@ -5,18 +5,31 @@ from models import cnn_astronet_model, inceptiontime_model
 # =============================================================================
 EXPERIMENTS = [
     # --- CNN Experiments ---
-    {
-        'model_function': cnn_astronet_model.main,
-        'dataset_filename': 'lcs_lag_99.npz',
-        'hyperparams': {'epochs': 100, 'learning_rate': 0.001, 'early_stopping_patience': 25,
-                        'restore_best_weights': True},
-    },
-    {
-        'model_function': cnn_astronet_model.main,
-        'dataset_filename': 'lcs_lag_90_2001.npz',
-        'hyperparams': {'epochs': 100, 'learning_rate': 0.001, 'early_stopping_patience': 25,
-                        'restore_best_weights': True},
-    },
+    # {
+    #     'model_function': cnn_astronet_model.main,
+    #     'dataset_filename': 'lcs_lag_99.npz',
+    #     'hyperparams': {'epochs': 100, 'learning_rate': 0.001, 'early_stopping_patience': 25,
+    #                     'restore_best_weights': True, 'dropout': 0.5},
+    # },
+    # {
+    #     'model_function': cnn_astronet_model.main,
+    #     'dataset_filename': 'lcs_lag_99.npz',
+    #     'hyperparams': {'epochs': 100, 'learning_rate': 0.001, 'early_stopping_patience': 25,
+    #                     'restore_best_weights': True, 'dropout': 0.25},
+    # },
+    # {
+    #     'model_function': cnn_astronet_model.main,
+    #     'dataset_filename': 'lcs_lag_99.npz',
+    #     'hyperparams': {'epochs': 100, 'learning_rate': 0.001, 'early_stopping_patience': 25,
+    #                     'restore_best_weights': False, 'dropout': 0.5},
+    # },
+    # {
+    #     'model_function': cnn_astronet_model.main,
+    #     'dataset_filename': 'lcs_lag_99.npz',
+    #     'hyperparams': {'epochs': 100, 'learning_rate': 0.001, 'early_stopping_patience': 25,
+    #                     'restore_best_weights': False, 'dropout': 0.25},
+    # },
+    # Rodou até aqui...
 
     # # --- Mamba Experiments ---
     # {
@@ -33,18 +46,24 @@ EXPERIMENTS = [
     # },
 
     # --- InceptionTime Experiments ---
-    {
-        'model_function': inceptiontime_model.main,
-        'dataset_filename': 'lcs_lag_99.npz',
-        'hyperparams': {'epochs': 100, 'early_stopping_patience': 25,
-                        'restore_best_weights': True}
-    },
-    {
-        'model_function': inceptiontime_model.main,
-        'dataset_filename': 'lcs_lag_90_2001.npz',
-        'hyperparams': {'epochs': 100, 'early_stopping_patience': 25,
-                        'restore_best_weights': True}
-    },
+    # {
+    #     'model_function': inceptiontime_model.main,
+    #     'dataset_filename': 'lcs_lag_99.npz',
+    #     'hyperparams': {'epochs': 30, 'early_stopping_patience': 5,
+    #                     'restore_best_weights': False}
+    # },
+    # {
+    #     'model_function': inceptiontime_model.main,
+    #     'dataset_filename': 'lcs_lag_99.npz',
+    #     'hyperparams': {'epochs': 30, 'early_stopping_patience': 10 ,
+    #                     'restore_best_weights': False}
+    # },
+    # {
+    #     'model_function': inceptiontime_model.main,
+    #     'dataset_filename': 'lcs_lag_99.npz',
+    #     'hyperparams': {'epochs': 30, 'early_stopping_patience': 10,
+    #                     'restore_best_weights': False}
+    # },
 ]
 
 

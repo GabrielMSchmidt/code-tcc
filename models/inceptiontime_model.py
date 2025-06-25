@@ -13,12 +13,13 @@ def create_model(epochs, early_stopping_patience, restore_best_weights):
         use_bottleneck=True,
         depth=6,
         verbose=True,
-        metrics=['accuracy', tf.keras.metrics.AUC(curve="PR", name='auc_pr')],
+        metrics=['accuracy', 'f1_score', tf.keras.metrics.AUC(curve="PR", name='auc_pr')],
         callbacks=[
             tf.keras.callbacks.EarlyStopping(
                 monitor='auc_pr',
                 mode='max',
                 patience=early_stopping_patience,
+                min_delta=0.01,
                 verbose=1,
                 restore_best_weights=restore_best_weights),
             tf.keras.callbacks.ReduceLROnPlateau(
