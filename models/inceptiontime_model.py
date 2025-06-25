@@ -12,13 +12,12 @@ def create_model(epochs, early_stopping_patience, restore_best_weights):
         use_residual=True,
         use_bottleneck=True,
         depth=6,
-        random_state=42,
         verbose=True,
         metrics=['accuracy', tf.keras.metrics.AUC(curve="PR", name='auc_pr')],
         callbacks=[
             tf.keras.callbacks.EarlyStopping(
                 monitor='auc_pr',
-                mode='auto',
+                mode='max',
                 patience=early_stopping_patience,
                 verbose=1,
                 restore_best_weights=restore_best_weights),
@@ -26,10 +25,11 @@ def create_model(epochs, early_stopping_patience, restore_best_weights):
                 monitor='auc_pr',
                 mode='max',
                 factor=0.2,
-                patience=10,
+                patience=5,
                 min_lr=1e-6,
                 verbose=1),
-        ]
+        ],
+        loss='binary_crossentropy'
     )
     return model
 

@@ -248,7 +248,6 @@ def plot_pr_curve(y_true, y_pred_proba, model_name, save_path):
     else:
         plt.show()
     plt.close()
-    return pr_auc
 
 def save_results(model_name, dataset_path, hyperparameters, history, y_true, y_pred_proba, training_time, threshold=0.5):
     """
@@ -260,8 +259,8 @@ def save_results(model_name, dataset_path, hyperparameters, history, y_true, y_p
     # 1. Criar um diretório único para este experimento
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     dataset_name = os.path.splitext(os.path.basename(dataset_path))[0]
-    epochs = hyperparameters.get('epochs', 'N_A')
-    experiment_name = f"{model_name}_{dataset_name}_e{epochs}_{timestamp}"
+    pr_auc = average_precision_score(y_true, y_pred_proba)
+    experiment_name = f"{model_name}_{dataset_name}_e{pr_auc:.2f}_{timestamp}"
     project_root = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(project_root)
     results_dir = os.path.join(project_root, 'results')
@@ -274,7 +273,7 @@ def save_results(model_name, dataset_path, hyperparameters, history, y_true, y_p
     evaluate_model_performance(y_true, y_pred_proba, model_name, threshold, save_path=os.path.join(exp_results_dir, 'confusion_matrix.png'))
     plot_learning_curves(history, model_name, save_path=os.path.join(exp_results_dir, 'learning_curves.png'))
     plot_roc_curve(y_true, y_pred_proba, model_name, os.path.join(exp_results_dir, 'roc_curve.png'))
-    pr_auc = plot_pr_curve(y_true, y_pred_proba, model_name, os.path.join(exp_results_dir, 'pr_curve.png'))
+    plot_pr_curve(y_true, y_pred_proba, model_name, os.path.join(exp_results_dir, 'pr_curve.png'))
 
     # 3. Salvar as predições para gráficos futuros
     y_true_flat = y_true.flatten()
