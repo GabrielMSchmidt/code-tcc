@@ -81,10 +81,20 @@ def split_data_by_column(global_data, local_data, labels, splits):
 
     original_total_samples = len(labels)
     print("--- Verificação da Divisão ---")
+    print(f"Total de amostras: {original_total_samples}")
     print(f"Amostras no conjunto de Treino: {len(data_dict['y_train'])} ({len(data_dict['y_train']) / original_total_samples:.2%})")
     print(f"Amostras no conjunto de Validação: {len(data_dict['y_val'])} ({len(data_dict['y_val']) / original_total_samples:.2%})")
     print(f"Amostras no conjunto de Teste: {len(data_dict['y_test'])} ({len(data_dict['y_test']) / original_total_samples:.2%})")
 
+    print("\n--- Distribuição Geral das Classes ---")
+
+    class_1_total = np.sum(labels)
+    class_0_total = original_total_samples - class_1_total
+    class_1_perc = (class_1_total / original_total_samples) * 100
+    class_0_perc = (class_0_total / original_total_samples) * 100
+
+    print(f"-> Classe 0 (Não Planeta): {int(class_0_total)} ({class_0_perc:.2f}%)")
+    print(f"-> Classe 1 (Planeta):   {int(class_1_total)} ({class_1_perc:.2f}%)")
     return data_dict
 
 
@@ -238,7 +248,7 @@ def plot_pr_curve(y_true, y_pred_proba, model_name, save_path):
     else:
         plt.show()
     plt.close()
-
+    return pr_auc
 
 def save_results(model_name, dataset_path, hyperparameters, history, y_true, y_pred_proba, training_time, threshold=0.5):
     """
@@ -264,7 +274,7 @@ def save_results(model_name, dataset_path, hyperparameters, history, y_true, y_p
     evaluate_model_performance(y_true, y_pred_proba, model_name, threshold, save_path=os.path.join(exp_results_dir, 'confusion_matrix.png'))
     plot_learning_curves(history, model_name, save_path=os.path.join(exp_results_dir, 'learning_curves.png'))
     plot_roc_curve(y_true, y_pred_proba, model_name, os.path.join(exp_results_dir, 'roc_curve.png'))
-    plot_pr_curve(y_true, y_pred_proba, model_name, os.path.join(exp_results_dir, 'pr_curve.png'))
+    pr_auc = plot_pr_curve(y_true, y_pred_proba, model_name, os.path.join(exp_results_dir, 'pr_curve.png'))
 
     # 3. Salvar as predições para gráficos futuros
     y_true_flat = y_true.flatten()
@@ -283,7 +293,8 @@ def save_results(model_name, dataset_path, hyperparameters, history, y_true, y_p
         'model_name': model_name,
         'dataset': dataset_name,
         'accuracy': accuracy_score(y_true, y_pred_classes),
-        'auc': roc_auc_score(y_true, y_pred_proba),
+        'auc-roc': roc_auc_score(y_true, y_pred_proba),
+        'auc-pr': pr_auc,
         'precision_class1': precision_score(y_true, y_pred_classes, pos_label=1, zero_division=0),
         'recall_class1': recall_score(y_true, y_pred_classes, pos_label=1, zero_division=0),
         'f1_score_class1': f1_score(y_true, y_pred_classes, pos_label=1, zero_division=0),

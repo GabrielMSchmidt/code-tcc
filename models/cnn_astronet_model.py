@@ -9,7 +9,7 @@ from utils import model_utils
 from sklearn.utils import class_weight
 
 
-def create_model(global_view_shape=(201, 1), local_view_shape=(61, 1), learning_rate=0.001):
+def create_model(global_view_shape=(201, 1), local_view_shape=(61, 1), learning_rate=0.001, dropout=0.5):
     """
     Cria um modelo CNN inspirado na Astronet para classificação binária de curvas de luz.
     """
@@ -82,7 +82,7 @@ def create_model(global_view_shape=(201, 1), local_view_shape=(61, 1), learning_
     for _ in range(4):
         x = Dense(512, activation='relu')(x)
         x = BatchNormalization()(x)
-        x = Dropout(0.5)(x)
+        x = Dropout(dropout)(x)
 
     output = Dense(1, name='output_logits')(x)
 
@@ -129,7 +129,8 @@ def main(dataset_filename, hyperparams):
     model = create_model(
         global_view_shape=(X_global_reshaped.shape[1], 1),
         local_view_shape=(X_local_reshaped.shape[1], 1),
-        learning_rate=hyperparams['learning_rate']
+        learning_rate=hyperparams['learning_rate'],
+        dropout=hyperparams['dropout']
     )
     model.summary()
 
