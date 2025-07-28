@@ -5,24 +5,20 @@ import os
 
 
 MODELS_TO_PLOT = {
-    'CNN (rw=true)': {
-        'folder_name': 'CNN_lcs_lag_90_e100_20250622-002513',
+    'CNN': {
+        'folder_name': 'CNN-Astronet_lcs_lag_99_pr0.8756_20250625-134757',
         'color': 'blue'
     },
-    'CNN (rw=false)': {
-        'folder_name': 'CNN_lcs_lag_90_e100_20250622-002920',
+    'InceptionTime': {
+        'folder_name': 'InceptionTime_lcs_lag_99_pr0.8636_20250626-102931',
         'color': 'purple'
     },
-    'CNN Astronet(rw=true)': {
-        'folder_name': 'CNN-Astronet_lcs_lag_90_e100_20250622-003743',
+    'Mamba': {
+        'folder_name': 'Mamba_lcs_lag_99_pr0.8251_20250626-115313',
         'color': 'green'
-    },
-    'CNN Astronet (rw=false)': {
-        'folder_name': 'CNN-Astronet_lcs_lag_90_e100_20250622-004858',
-        'color': 'red'
     }
 }
-PLOT_NAME = 'CNN_Astronet-comparison.png'
+PLOT_NAME = 'models-comparison-pt.png'
 
 project_root = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(project_root)
@@ -57,17 +53,17 @@ for model_name, config in MODELS_TO_PLOT.items():
 # --- Formatação dos Gráficos ---
 
 # Gráfico da Curva PR
-ax1.set_xlabel('Recall (Sensibilidade)', fontsize=12)
-ax1.set_ylabel('Precision', fontsize=12)
-ax1.set_title('Curva Precision-Recall Comparativa', fontsize=14)
+ax1.set_xlabel('Sensibilidade', fontsize=12)
+ax1.set_ylabel('Precisão', fontsize=12)
+ax1.set_title('Curva Precisão-Sensibilidade Comparativa', fontsize=14)
 ax1.set_xlim([0.2, 1.0])
 ax1.set_ylim([0.2, 1.0])
 ax1.grid(linestyle='--')
 ax1.legend(loc="lower left")
 
 # Gráfico da Curva ROC
-ax2.set_xlabel('Taxa de Falsos Positivos (FPR)', fontsize=12)
-ax2.set_ylabel('Taxa de Verdadeiros Positivos (TPR)', fontsize=12)
+ax2.set_xlabel('Taxa de Falsos Positivos (TFP)', fontsize=12)
+ax2.set_ylabel('Taxa de Verdadeiros Positivos (TVP)', fontsize=12)
 ax2.set_title('Curva ROC Comparativa', fontsize=14)
 ax2.set_xlim([0.0, 1.0])
 ax2.set_ylim([0.0, 1.0])

@@ -8,3 +8,5 @@ lcs_mid_90.npz
 lcs_sml_80_2001.npz
 lcs_sml_90.npz
 lcs_sml_99_2001.npz
+.gitignore
+.DS_Store

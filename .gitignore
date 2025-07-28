@@ -2,3 +2,6 @@
 .venv
 LC.tar.gz
 results
+.gitignore
+.DS_Store
+.idea
