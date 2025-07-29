@@ -1,6 +1,6 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Completed-blue?style=flat-square" alt="Status"/>
-  <img src="https://img.shields.io/github/license/GabrielMSchmidt/YOUR-REPO-NAME?style=flat-square&color=blue" alt="License"/>
+  <img src="https://img.shields.io/github/license/GabrielMSchmidt/code-tcc?style=flat-square&color=blue" alt="License"/>
 </p>
 
 # Exoplanet Identification Using Deep Learning Techniques
@@ -28,9 +28,9 @@ The main project files are listed below:
 ├── utils/                  <- Auxiliary execution scripts
 
 ├── LICENSE
+├── README.md
 ├── main_datasets.py        <- Main script for dataset generation and pre-processing
 ├── main_model.py           <- Main script for model execution
-├── README.md
 └── tces_with_labels_v3.csv <- Auxiliary table for Dataset generation
 
 ```
