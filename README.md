@@ -22,8 +22,8 @@ This project was developed using some of the main tools from the Python Data Sci
 
 The main project files are listed below:
 ```
-├── .idea
 ├── datasets/               <- Different pre-processed versions of the raw Dataset
+├── documentation/          <- Repository documentation in .pdf
 ├── models/                 <- Deep Learning Models: CNN, InceptionTime and Mamba
 ├── utils/                  <- Auxiliary execution scripts
 
