@@ -102,12 +102,6 @@ def main(dataset_filename, hyperparams):
     project_root = os.path.dirname(script_dir)
     DATASET_PATH = os.path.join(project_root, 'datasets', dataset_filename)
     MODEL_NAME = 'CNN-Astronet'
-    # hyperparams = {
-    #     'epochs': 100,
-    #     'learning_rate': 0.001,
-    #     'early_stopping_patience': 15,
-    #     'restore_best_weights': True,
-    # }
 
     print(f"\n--- Iniciando Experimento: {MODEL_NAME} | Dataset: {dataset_filename} ---")
     print(f"Hiperparâmetros: {hyperparams}")
